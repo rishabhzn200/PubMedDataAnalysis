@@ -2,7 +2,6 @@ import re
 from string import ascii_lowercase
 from tqdm import tqdm
 from ScrapeData import Scraper
-import pickle
 from FileOperations import FileOperations
 import GlobalVariables as GV
 
@@ -100,7 +99,7 @@ def main():
     # Initialize the Glossary
     glossarylist, synonymlist = InitializeGlossary()
 
-    
+
 
 if __name__ =='__main__':
     main()

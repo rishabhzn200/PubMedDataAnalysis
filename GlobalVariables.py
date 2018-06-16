@@ -1,4 +1,6 @@
-# Paths
+# Global Variables
+
+
 # Path of glossary terms
 healthGlossaryFilePath = './saveddata/healthglossary.pkl'
 
