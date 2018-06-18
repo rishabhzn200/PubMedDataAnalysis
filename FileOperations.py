@@ -10,11 +10,16 @@ class FileOperations:
     def SaveFile(self, filepath, obj, mode='wb'):
 
         with open(filepath, mode) as picklefile:
-            if type(obj) != 'type':
+            if mode == 'w':
+                for data in obj:
+                    picklefile.write(data)
+                    picklefile.write('\n')
+
+            elif type(obj) != 'type':
                 pickle.dump(obj, picklefile, pickle.HIGHEST_PROTOCOL)
             else:
                 for data in obj:
-                    picklefile.write(id)
+                    picklefile.write(data)
                     picklefile.write('\n')
 
     # Function to load the file using pickle

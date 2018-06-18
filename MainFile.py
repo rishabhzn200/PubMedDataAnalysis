@@ -4,6 +4,7 @@ from tqdm import tqdm
 from ScrapeData import Scraper
 from FileOperations import FileOperations
 import GlobalVariables as GV
+from DataPreprocessing import Preprocessing
 
 
 def GetGlossaryTerms():
@@ -30,6 +31,7 @@ def GetGlossaryTerms():
 
         # Find all the list items - Glosarry terms
         resultlisttag = scraper.find(soup, "ul", **{'class':'resultList'})
+        # resultlisttag = scraper.find(soup, "ul", class_='resultList')
         glossarylistaglist = scraper.findall(resultlisttag, "li")
 
         # Loop to iterate over the list of all the terms found in the page
@@ -53,18 +55,21 @@ def GetGlossaryTerms():
                 term1, term2 = matches[1], matches[2]
 
                 # save in synonym list
-                synonymlist.append((term1, term2))
+                synonymlist.append((term1.lower().split(), term2.lower().split()))
 
                 # Append the glossary term to the list
                 glossarylist.append(term1)
 
             else:
                 # Append the glossary term to the list
-                glossarylist.append(glossaryterm)
+                glossarylist.append(glossaryterm.split( ':' )[0])
 
+    # Additional step to save the glossary in the format which can be used for tokenization eaily
+    glossarylist = (set(glossarylist))
+    glossarylist = [(gloss.lower().split()) for gloss in glossarylist]
+
+    # Return the glossary list and the synonyms list
     return glossarylist, synonymlist
-
-
 
 def InitializeGlossary():
 
@@ -94,12 +99,60 @@ def InitializeGlossary():
     return glossarylist, synonymlist
 
 
+def SaveGlossary(glossarylist, synonymlist):
+    fo = FileOperations()
+
+    if fo.exists(GV.glossaryFilePath):
+        return
+    else:
+        glossarylist, synonymlist = fo.LoadFile(GV.healthGlossaryFilePath), fo.LoadFile(GV.synonymsFilePath)
+        synonymterm2 = set(tuple(term2) for term1, term2 in synonymlist)
+        synonymterm2 = list((list(term) for term in synonymterm2))
+        glossarylist += list(synonymterm2)
+        fo.SaveFile(GV.glossaryFilePath, glossarylist, mode='wb')
+    del fo
+
+
+def PreprocessData():
+    # Create an object initialized to None
+    pubmedarticlelists = None
+
+    # Create FileOperations object
+    fo = FileOperations()
+
+    # parse the xml file
+    p = Preprocessing()
+
+    # If parsed file is present then load the file else parse the file
+    if fo.exists(GV.parsedDataFile):
+        pubmedarticlelists = p.LoadFile(GV.parsedDataFile)
+
+    else:
+        # Call the Parse method
+        pubmedarticlelists, unsavedpmids = p.parse(GV.inputXmlFile)
+        print(len(pubmedarticlelists))
+        print(len(unsavedpmids))
+
+        # Save the parsed data to a file
+        fo.SaveFile(GV.parsedDataFile, pubmedarticlelists, mode='wb')
+        fo.SaveFile(GV.unsavedPmidFile, unsavedpmids, mode='w')
+
+    del fo
+
+    return pubmedarticlelists
+
 def main():
 
     # Initialize the Glossary
     glossarylist, synonymlist = InitializeGlossary()
 
+    # Save the glossary
+    SaveGlossary(glossarylist, synonymlist)
 
+    # Preprocess the data in the xml file
+    pubmedarticlelists = PreprocessData()
+
+    # Create Model
 
 if __name__ =='__main__':
     main()
