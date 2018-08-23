@@ -1,4 +1,4 @@
-# PubMedDatasetModel
+# PubMedDataAnalysis
 
 This Project was developed to:
 
@@ -11,4 +11,4 @@ Libraries Used: <br />
 <em>1. BeautifulSoup : </em>To Scrape data.<br />
 <em>2. lxml : </em>To Preprocess XML data.<br/>
 <em>3. NLTK :</em> (Tokenization, Stemming, Lemmatization).<br/> 
-<em>4. Gensim :</em> For models (Doc2Vec, TFIDF and LSA).<br/>,
+<em>4. Gensim :</em> For models (Doc2Vec, TFIDF and LSA).<br/>
