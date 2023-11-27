@@ -1,6 +1,6 @@
-import requests
 from bs4 import BeautifulSoup
 from random import choice
+from security import safe_requests
 
 
 class Scraper:
@@ -22,7 +22,7 @@ class Scraper:
 
     # Get the html page for the given URL
     def getlink(self, url):
-        page = requests.get(url, headers={"User-Agent": choice(Scraper.desktop_agents)})
+        page = safe_requests.get(url, headers={"User-Agent": choice(Scraper.desktop_agents)})
         soup = BeautifulSoup(page.content, "html.parser")
         return soup
 
