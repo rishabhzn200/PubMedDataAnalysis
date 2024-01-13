@@ -22,7 +22,7 @@ class Scraper:
 
     # Get the html page for the given URL
     def getlink(self, url):
-        page = requests.get(url, headers={"User-Agent": choice(Scraper.desktop_agents)})
+        page = requests.get(url, headers={"User-Agent": choice(Scraper.desktop_agents)}, timeout=60)
         soup = BeautifulSoup(page.content, "html.parser")
         return soup
 
