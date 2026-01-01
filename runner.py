@@ -9,23 +9,23 @@ from nltk.corpus import wordnet
 from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.stem.snowball import SnowballStemmer
 from nltk.corpus import stopwords
-from ScrapeData import Scraper
-from FileOperations import FileOperations
-import GlobalVariables as GV
-from DataPreprocessing import Preprocessing
-from Doc2VecModel import Doc2VecModel
+from data_scraper import DataRetriever
+from file_utils import FileHandler
+import constants as GV
+from data_preprocessor import Preprocessor
+from model import Doc2VecModel
 
 
-def GetGlossaryTerms():
+def get_glossary_terms():
     # Create a variable which holds the URL to be scraped
-    baseurl = 'https://www.ncbi.nlm.nih.gov/pubmedhealth/topics/health/'
+    baseurl = "https://www.ncbi.nlm.nih.gov/pubmedhealth/topics/health/"
 
     # Define the pattern to be searched for in the glossary terms
-    pattern1 = re.compile(r'(.*) \(see (.*)\)')
-    pattern2 = re.compile(r'(.*) \((.*)\)')
+    pattern1 = re.compile(r"(.*) \(see (.*)\)")
+    pattern2 = re.compile(r"(.*) \((.*)\)")
 
     # Create an object of Scraper class
-    scraper = Scraper()
+    data_retriever = DataRetriever()
 
     # Create a variable to hold the list of glossary terms and list of synonymous terms
     glossarylist = []
@@ -33,27 +33,27 @@ def GetGlossaryTerms():
 
     # Loop through all the characters in lowercase ascii(a-z)
     for char in tqdm(ascii_lowercase):
-        url = baseurl + char + '/'
+        url = baseurl + char + "/"
 
         # Get the html page
-        soup = scraper.getlink(url)
+        soup = data_retriever.getlink(url)
 
         # Find all the list items - Glosarry terms
-        resultlisttags = scraper.findall(soup, "ul", **{'class':'resultList'})
+        resultlisttags = data_retriever.findall(soup, "ul", **{"class": "resultList"})
         # resultlisttag = scraper.find(soup, "ul", class_='resultList')
 
         for resultlisttag in resultlisttags:
-            glossarylistaglist = scraper.findall(resultlisttag, "li")
+            glossarylistaglist = data_retriever.findall(resultlisttag, "li")
 
             # Loop to iterate over the list of all the terms found in the page
             for glossarylistag in glossarylistaglist:
                 litext = glossarylistag.text.strip()
-                glossaryterm = scraper.find(glossarylistag, "a").text.strip()
+                glossaryterm = data_retriever.find(glossarylistag, "a").text.strip()
 
-                if litext != glossaryterm or '(' in litext:
+                if litext != glossaryterm or "(" in litext:
                     # Processing required
                     # Get rid of colon
-                    litext = litext.split( ':' )[0]
+                    litext = litext.split(":")[0]
 
                     # Find the pattern1
                     matches = re.match(pattern1, litext)
@@ -73,70 +73,75 @@ def GetGlossaryTerms():
 
                 else:
                     # Append the glossary term to the list
-                    glossarylist.append(glossaryterm.split( ':' )[0])
+                    glossarylist.append(glossaryterm.split(":")[0])
 
     # Additional step to save the glossary in the format which can be used for tokenization easily
-    glossarylist = (set(glossarylist))
+    glossarylist = set(glossarylist)
     glossarylist = [(gloss.lower().split()) for gloss in glossarylist]
 
     # Return the glossary list and the synonyms list
     return glossarylist, synonymlist
 
-def InitializeGlossary():
+
+def initialize_glossary():
 
     # Create FileOperation object
-    fo = FileOperations()
+    fo = FileHandler()
 
     # Initialize the two list to None
-    glossarylist, synonymlist = [None]*2
+    glossarylist, synonymlist = [None] * 2
 
     if fo.exists(GV.healthGlossaryFilePath):
         # Load the file from disk
-        glossarylist, synonymlist = fo.LoadFile(GV.healthGlossaryFilePath) , fo.LoadFile(GV.synonymsFilePath)
+        glossarylist, synonymlist = fo.load_file(
+            GV.healthGlossaryFilePath
+        ), fo.load_file(GV.synonymsFilePath)
 
     else:
         # Get all the glossary terms
-        glossarylist, synonymlist = GetGlossaryTerms()
+        glossarylist, synonymlist = get_glossary_terms()
 
         # Save the glossary terms
 
-        fo.SaveFile(GV.healthGlossaryFilePath, glossarylist, mode='wb')
+        fo.save_file(GV.healthGlossaryFilePath, glossarylist, mode="wb")
 
         # Save the synonyms
-        fo.SaveFile(GV.synonymsFilePath, synonymlist, mode='wb')
+        fo.save_file(GV.synonymsFilePath, synonymlist, mode="wb")
 
     del fo
 
     return glossarylist, synonymlist
 
 
-def SaveGlossary(glossarylist, synonymlist):
-    fo = FileOperations()
+def save_glossary(glossarylist, synonymlist):
+    fo = FileHandler()
 
     if fo.exists(GV.glossaryFilePath):
         return
     else:
-        glossarylist, synonymlist = fo.LoadFile(GV.healthGlossaryFilePath), fo.LoadFile(GV.synonymsFilePath)
+        glossarylist, synonymlist = fo.load_file(
+            GV.healthGlossaryFilePath
+        ), fo.load_file(GV.synonymsFilePath)
         synonymterm2 = set(tuple(term2) for term1, term2 in synonymlist)
         synonymterm2 = list((list(term) for term in synonymterm2))
         glossarylist += list(synonymterm2)
-        fo.SaveFile(GV.glossaryFilePath, glossarylist, mode='wb')
+        fo.save_file(GV.glossaryFilePath, glossarylist, mode="wb")
     del fo
 
 
-def PreprocessData():
+def preprocess_data():
     # Create an object initialized to None
     pubmedarticlelists = None
 
     # Create FileOperations object
-    fo = FileOperations()
+    fo = FileHandler()
 
     # parse the xml file
-    p = Preprocessing()
+    p = Preprocessor()
 
     # If parsed file is present then load the file else parse the file
     if fo.exists(GV.parsedDataFile):
-        pubmedarticlelists = p.LoadFile(GV.parsedDataFile)
+        pubmedarticlelists = p.load_file(GV.parsedDataFile)
 
     else:
         # Call the Parse method
@@ -146,36 +151,38 @@ def PreprocessData():
         print(len(unsavedpmids))
 
         # Save the parsed data to a file
-        fo.SaveFile(GV.parsedDataFile, pubmedarticlelists, mode='wb')
-        fo.SaveFile(GV.unsavedPmidFile, unsavedpmids, mode='w')
+        fo.save_file(GV.parsedDataFile, pubmedarticlelists, mode="wb")
+        fo.save_file(GV.unsavedPmidFile, unsavedpmids, mode="w")
 
-        pubmedarticlelists = p.LoadFile(GV.parsedDataFile)
+        pubmedarticlelists = p.load_file(GV.parsedDataFile)
 
     del fo
 
     return pubmedarticlelists
 
 
-def GetDocuments(articlelists, title=True, abstract=True, meshwords=False):
-    p = Preprocessing()
-    docs = p.GetDocuments(articlelists, title=title, abstract=abstract, meshwords=meshwords)
+def get_documents(articlelists, title=True, abstract=True, meshwords=False):
+    p = Preprocessor()
+    docs = p.GetDocuments(
+        articlelists, title=title, abstract=abstract, meshwords=meshwords
+    )
     del p
     return docs
 
 
-def TokenizeDocs(docs, glossarylist, filename=GV.tokenizedDocumentD2VFile):
+def tokenize_docs(docs, glossarylist, filename=GV.tokenizedDocumentD2VFile):
     tokenizeddocs = []
     combineddocuments = []
-    fo = FileOperations()
+    fo = FileHandler()
     # tokenizer = RegexpTokenizer(r'\w+')
     if fo.exists(filename):
         # Load the file
-        combineddocuments = fo.LoadFile(filename)
+        combineddocuments = fo.load_file(filename)
         pass
 
     else:
         tokenizer = MWETokenizer(glossarylist)
-        regtokenizer = RegexpTokenizer(r'\w+')
+        regtokenizer = RegexpTokenizer(r"\w+")
         for doc in tqdm(docs):
             sentences = sent_tokenize(doc)
 
@@ -192,7 +199,7 @@ def TokenizeDocs(docs, glossarylist, filename=GV.tokenizedDocumentD2VFile):
             combineddocuments.append(tokdoc)
 
         # Save the file
-        fo.SaveFile(filename, combineddocuments, mode='wb')
+        fo.save_file(filename, combineddocuments, mode="wb")
 
     del fo
 
@@ -201,33 +208,34 @@ def TokenizeDocs(docs, glossarylist, filename=GV.tokenizedDocumentD2VFile):
 
 def get_wordnet_pos(treebank_tag):
 
-    if treebank_tag.startswith('J'):
+    if treebank_tag.startswith("J"):
         return wordnet.ADJ
-    elif treebank_tag.startswith('V'):
+    elif treebank_tag.startswith("V"):
         return wordnet.VERB
-    elif treebank_tag.startswith('N'):
+    elif treebank_tag.startswith("N"):
         return wordnet.NOUN
-    elif treebank_tag.startswith('R'):
+    elif treebank_tag.startswith("R"):
         return wordnet.ADV
     else:
         return wordnet.NOUN
 
-def TokenizeDocsNew(docs, glossarylist, filename=GV.tokenizedDocumentD2VFile):
+
+def tokenize_docs_v2(docs, glossarylist, filename=GV.tokenizedDocumentD2VFile):
     tokenizeddocs = []
     combineddocuments = []
-    fo = FileOperations()
+    fo = FileHandler()
     # tokenizer = RegexpTokenizer(r'\w+')
     if fo.exists(filename):
         # Load the file
-        combineddocuments = fo.LoadFile(filename)
+        combineddocuments = fo.load_file(filename)
         pass
 
     else:
         tokenizer = MWETokenizer(glossarylist)
-        regtokenizer = RegexpTokenizer(r'\w+')
+        regtokenizer = RegexpTokenizer(r"\w+")
         lmtzr = WordNetLemmatizer()
         stemmer = SnowballStemmer("english", ignore_stopwords=True)
-        stop_words = stopwords.words('english')
+        stop_words = stopwords.words("english")
         for doc in tqdm(docs):
             sentences = sent_tokenize(doc)
 
@@ -243,13 +251,18 @@ def TokenizeDocsNew(docs, glossarylist, filename=GV.tokenizedDocumentD2VFile):
 
                 # Lemmatize the sentence. Find the POS tags and then lemmatize
                 tokens_lowecase_tagged = nltk.pos_tag(token_lowercase)
-                lammetized_sentence = [lmtzr.lemmatize(wrd, pos=get_wordnet_pos(tag)) for wrd, tag in tokens_lowecase_tagged]
+                lammetized_sentence = [
+                    lmtzr.lemmatize(wrd, pos=get_wordnet_pos(tag))
+                    for wrd, tag in tokens_lowecase_tagged
+                ]
 
                 # Stem the sentence
                 stemmed_sentence = [stemmer.stem(wrd) for wrd in lammetized_sentence]
 
                 # Remove the stop words
-                processed_sentence = [word for word in stemmed_sentence if word not in stop_words]
+                processed_sentence = [
+                    word for word in stemmed_sentence if word not in stop_words
+                ]
 
                 tmp.append(processed_sentence)
             tokenizeddocs.append(tmp)
@@ -260,49 +273,53 @@ def TokenizeDocsNew(docs, glossarylist, filename=GV.tokenizedDocumentD2VFile):
             combineddocuments.append(tokdoc)
 
         # Save the file
-        fo.SaveFile(filename, combineddocuments, mode='wb')
+        fo.save_file(filename, combineddocuments, mode="wb")
 
     del fo
 
     return combineddocuments
 
 
-def Doc2Vec(docs, ids, glossarylist, pubmedarticlelists):
+def doc_2_vec(docs, ids, glossarylist, pubmedarticlelists):
 
     # Tokenize all the docs
-    tokenizeddocs = TokenizeDocs(docs, glossarylist, GV.tokenizedDocumentD2VFile)
+    tokenizeddocs = tokenize_docs(docs, glossarylist, GV.tokenizedDocumentD2VFile)
 
     # Create Doc2Vec Model. Changing parameters will change the model name
-    doc2vecmodel = Doc2VecModel(seed=1, num_features = 200, min_word_count = 2, context_size = 3)
-    taggeddocuments = doc2vecmodel.CreateTaggedDocuments(tokenizeddocs, ids)
-    model = doc2vecmodel.Model(taggeddocuments, ids)
+    doc2vecmodel = Doc2VecModel(
+        seed=1, num_features=200, min_word_count=2, context_size=3
+    )
+    taggeddocuments = doc2vecmodel.create_tagged_documents(tokenizeddocs, ids)
+    model = doc2vecmodel.get_model(taggeddocuments, ids)
 
     # Get model filename
-    modelfile = doc2vecmodel.GetModelFileName()
+    modelfile = doc2vecmodel.get_model_fileName()
 
-    #Load the model
-    model = doc2vecmodel.LoadModel(modelfile)
+    # Load the model
+    model = doc2vecmodel.load_model(modelfile)
 
     # Save Similar Documents
-    doc2vecmodel.SaveSimilarDocuments(pubmedarticlelists, GV.similarDocumentListFile)
+    doc2vecmodel.save_similar_documents(pubmedarticlelists, GV.similarDocumentListFile)
 
-    #Play
-    similardocdict = FileOperations().LoadFile(GV.similarDocumentListFile)
-    print(similardocdict['29794785']['Title'])
-    print('---------------------------------------')
-    for id, title, score in similardocdict['29794785']['Similar']:
-        print(id, ' : ', title)
+    # Play
+    similardocdict = FileHandler().load_file(GV.similarDocumentListFile)
+    print(similardocdict["29794785"]["Title"])
+    print("---------------------------------------")
+    for id, title, score in similardocdict["29794785"]["Similar"]:
+        print(id, " : ", title)
 
-    doc2vecmodel.Visualize('29794785')
+    doc2vecmodel.visualize("29794785")
 
 
-def tfidf(docs, ids, glossarylist):
+def tf_idf(docs, ids, glossarylist):
 
     a = 20
     import gensim
     import numpy as np
-    tokenizeddocs = TokenizeDocsNew(docs, glossarylist, filename=GV.tokenizedDocumentTfidfFile)
 
+    tokenizeddocs = tokenize_docs_v2(
+        docs, glossarylist, filename=GV.tokenizedDocumentTfidfFile
+    )
 
     # from nltk.tokenize import word_tokenize
     # tokenizeddocs_nltk = [[w.lower() for w in word_tokenize(text)] for text in tqdm(docs)]
@@ -326,10 +343,13 @@ def tfidf(docs, ids, glossarylist):
     index = gensim.similarities.MatrixSimilarity.load(GV.similarityIndexFile)
     # sims = index[corpus_tfidf]
 
-    similarityMatrix = np.array([index[corpus_tfidf[i]]
-                                 for i in tqdm(range(len(corpus)))])
+    similarityMatrix = np.array(
+        [index[corpus_tfidf[i]] for i in tqdm(range(len(corpus)))]
+    )
 
-    np.save(GV.similarityMatrixTFfidf, similarityMatrix)  # .npy extension is added if not given
+    np.save(
+        GV.similarityMatrixTFfidf, similarityMatrix
+    )  # .npy extension is added if not given
     similarityMatrix = np.load(GV.similarityMatrixTFfidf)
 
     # Check the model
@@ -346,12 +366,12 @@ def tfidf(docs, ids, glossarylist):
     simdocs = npdocs[idx]
 
     for i in range(len(idx)):
-        print(simids[i], ' : ', simdocs[i])
+        print(simids[i], " : ", simdocs[i])
 
     a = 20
 
 
-def LSIModel(docs, ids, glossarylist):
+def lsi_model(docs, ids, glossarylist):
     # from LSIModel import LSIModel
     from nltk.corpus import stopwords
     import gensim
@@ -359,8 +379,10 @@ def LSIModel(docs, ids, glossarylist):
     from gensim.models import LsiModel
     from gensim.similarities import MatrixSimilarity
 
-    tokenizeddocs = TokenizeDocsNew(docs, glossarylist, filename=GV.tokenizedDocumentLSIFile)
-    stop_words = stopwords.words('english')
+    tokenizeddocs = tokenize_docs_v2(
+        docs, glossarylist, filename=GV.tokenizedDocumentLSIFile
+    )
+    stop_words = stopwords.words("english")
     tokenizeddocsf = [word for word in tqdm(tokenizeddocs) if word not in stop_words]
 
     dictionary = gensim.corpora.Dictionary(tokenizeddocsf)
@@ -369,10 +391,13 @@ def LSIModel(docs, ids, glossarylist):
     corpus_tfidf = tf_idf[corpus]
     lsi = LsiModel(corpus_tfidf, id2word=dictionary, num_topics=500)
     lsi_index = MatrixSimilarity(lsi[corpus_tfidf])
-    similarityMatrix = np.array([lsi_index[lsi[corpus_tfidf[i]]]
-                                    for i in tqdm(range(len(corpus)))])
+    similarityMatrix = np.array(
+        [lsi_index[lsi[corpus_tfidf[i]]] for i in tqdm(range(len(corpus)))]
+    )
 
-    np.save(GV.similarityMatrixLSI, similarityMatrix)  # .npy extension is added if not given
+    np.save(
+        GV.similarityMatrixLSI, similarityMatrix
+    )  # .npy extension is added if not given
     similarityMatrix = np.load(GV.similarityMatrixLSI)
 
     # Save the id list
@@ -395,31 +420,31 @@ def LSIModel(docs, ids, glossarylist):
     simdocs = npdocs[idx]
 
     for i in range(len(idx)):
-        print(simids[i], ' : ', simdocs[i])
-
-    a = 20
+        print(simids[i], " : ", simdocs[i])
 
 
 def main():
 
     # Initialize the Glossary
-    glossarylist, synonymlist = InitializeGlossary()
+    glossarylist, synonymlist = initialize_glossary()
 
     # Save the glossary
-    SaveGlossary(glossarylist, synonymlist)
+    save_glossary(glossarylist, synonymlist)
 
     # Preprocess the data in the xml file
-    pubmedarticlelists = PreprocessData()
+    pubmedarticlelists = preprocess_data()
 
     # Get the documents list: Title, Abstract and Mesh words or any combination of these
-    docs, ids = GetDocuments(pubmedarticlelists, title=True, abstract=True, meshwords=False)
+    docs, ids = get_documents(
+        pubmedarticlelists, title=True, abstract=True, meshwords=False
+    )
 
     # Use docs and their ids
 
     # Create Model: Doc2Vec and Tf-Idf
 
     # Doc2Vec model
-    Doc2Vec(docs, ids, glossarylist, pubmedarticlelists)
+    doc_2_vec(docs, ids, glossarylist, pubmedarticlelists)
 
     # Tf-Idf Model
     # tfidf(docs, ids, glossarylist)
@@ -427,5 +452,6 @@ def main():
     # LSI Model
     # LSIModel(docs, ids, glossarylist)
 
-if __name__ =='__main__':
+
+if __name__ == "__main__":
     main()

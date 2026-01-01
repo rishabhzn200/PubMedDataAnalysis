@@ -1,18 +1,23 @@
 # import all the libraries
 import lxml.etree as et
-from XmlTagNames import TagName, PubmedArticle
-from FileOperations import FileOperations
+from xml_tag_names import TagName, PubmedArticle
+from file_utils import FileHandler
 from tqdm import tqdm
 
 
 # Define a class to pre-process the xml file
-class Preprocessing:
+class Preprocessor:
 
     def __init__(self):
         pass
 
     def __getmeshwords(self, meshheadinglist):
-        meshwords = [meshword.strip() for meshheding in meshheadinglist for meshnode in meshheding for meshword in meshnode.text.split(',')]
+        meshwords = [
+            meshword.strip()
+            for meshheding in meshheadinglist
+            for meshnode in meshheding
+            for meshword in meshnode.text.split(",")
+        ]
         return meshwords
 
     def __getarticledata(self, article):
@@ -21,24 +26,24 @@ class Preprocessing:
             if node.tag == TagName.ArticleTitle:
                 title = node.text
             elif node.tag == TagName.Abstract:
-                abstract = ''
+                abstract = ""
                 for abstextnode in node:
 
                     text = abstextnode.text
                     if text is not None:
-                        abstract += ' ' + text.strip()
+                        abstract += " " + text.strip()
 
                     for innernodes in abstextnode:
                         text = innernodes.text
                         if text is not None:
-                            abstract += ' ' + text.strip()
+                            abstract += " " + text.strip()
                         tail = innernodes.tail
                         if tail is not None:
-                            abstract += ' ' + tail.strip()
+                            abstract += " " + tail.strip()
 
                     tail = abstextnode.tail
                     if tail is not None:
-                        abstract += ' ' + tail.strip()
+                        abstract += " " + tail.strip()
 
                 # try:
                 #     abstract = ''.join([abstextnode.text for abstextnode in list(node)])
@@ -47,7 +52,7 @@ class Preprocessing:
             elif node.tag == TagName.Language:
                 language = node.text
 
-        #print(abstract)
+        # print(abstract)
         return title, abstract, language
 
     # function to process medlinecitations
@@ -64,10 +69,10 @@ class Preprocessing:
                 #     pass
                 pass
             elif node.tag == TagName.DateCompleted:
-                dc = '-'.join([n.text for n in list(node)])
+                dc = "-".join([n.text for n in list(node)])
                 pass
             elif node.tag == TagName.DateRevised:
-                dr = '-'.join([n.text for n in list(node)])
+                dr = "-".join([n.text for n in list(node)])
                 pass
             elif node.tag == TagName.Article:
                 title, abstracttext, language = self.__getarticledata(node)
@@ -98,12 +103,14 @@ class Preprocessing:
             medlinecitations, pubmeddata = list(pubmedarticle)
             # print(medlinecitations, '\n', pubmeddata)
         except:
-            print('Unpack Error')
+            print("Unpack Error")
 
         # Process MedlineCitation
-        pmid, dc, dr, title, abstracttext, language, meshwords = self.__processmedlinecitation(medlinecitations)
+        pmid, dc, dr, title, abstracttext, language, meshwords = (
+            self.__processmedlinecitation(medlinecitations)
+        )
 
-        #TODO Currently not using the fields in PubmedData
+        # TODO Currently not using the fields in PubmedData
         # Process pubmeddata
         self.__processpubmeddata(pubmeddata)
 
@@ -114,40 +121,51 @@ class Preprocessing:
         pubmedarticlelist = []
         unsavedpmids = []
 
-        #Create an object of TagName Class
+        # Create an object of TagName Class
         tagname = TagName()
 
         # tree = ET.parse(filename)
-        context = et.iterparse(filename, events=('end',), tag=tagname.PubmedArticleSet)
+        context = et.iterparse(filename, events=("end",), tag=tagname.PubmedArticleSet)
         for event, PubmedArticleSet in context:
             # print(event, '\t', PubmedArticleSet)
             for index, pubmedarticle in tqdm(enumerate(PubmedArticleSet)):
-                pmid, dc, dr, title, abstracttext, language, meshwords = self.__processpubmedarticle(pubmedarticle)
-                pa = PubmedArticle(pmid, dc, dr, title, abstracttext, language, meshwords)
+                pmid, dc, dr, title, abstracttext, language, meshwords = (
+                    self.__processpubmedarticle(pubmedarticle)
+                )
+                pa = PubmedArticle(
+                    pmid, dc, dr, title, abstracttext, language, meshwords
+                )
 
-                if language in ['eng', None] and abstracttext not in ['', None]:
+                if language in ["eng", None] and abstracttext not in ["", None]:
                     pubmedarticlelist.append(pa)
                 else:
                     unsavedpmids.append(pmid)
-                    print(pmid, ' is not saved. ', 'Language = ', language)
+                    print(pmid, " is not saved. ", "Language = ", language)
                     # print('\t', language)
                     # if language == 'eng': print('Abstract = ', abstracttext)
                 # print(len(pubmedarticlelist))
 
         return pubmedarticlelist, unsavedpmids
 
-
-    def LoadFile(self, filename):
+    def load_file(self, filename):
         # Create FileOperations object
-        fo = FileOperations()
+        fo = FileHandler()
         # Load the file
-        articlelists = fo.LoadFile(filename)
+        articlelists = fo.load_file(filename)
 
         # Create an optional class obj and dict
         pubmedarticlelists = {
-            article.PMID: PubmedArticle(article.PMID, article.DateCompleted, article.DateRevised, article.ArticleTitle,
-                                        article.Abstract, article.Language, article.MeshWords) for i, article in
-            enumerate(articlelists)}
+            article.PMID: PubmedArticle(
+                article.PMID,
+                article.DateCompleted,
+                article.DateRevised,
+                article.ArticleTitle,
+                article.Abstract,
+                article.Language,
+                article.MeshWords,
+            )
+            for i, article in enumerate(articlelists)
+        }
 
         del fo
         return pubmedarticlelists
